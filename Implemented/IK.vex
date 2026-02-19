@@ -1,0 +1,44 @@
+#pragma config(Motor, port2, shoulder)
+#pragma config(Motor, port3, elbow)
+
+const float PI   = 3.14159265;
+const float gorp = 180.0 / PI;
+
+int toCmd(float deg)
+{
+    if (deg < 0)
+        deg = 0;
+
+    if (deg > 120)
+        deg = 120;
+
+    return (int)(-127 + (deg * (254.0 / 120.0)));
+}
+
+float elbo(float x, float y)
+{
+    float r  = pow(x, 2) + pow(y, 2);
+    float q1 = acos(r / 2 - 1);
+    return q1;
+}
+
+float sholder(float x, float y)
+{
+    float b  = elbo(x, y);
+    float q2 = atan2(y, x) - b / 2;
+    return q2;
+}
+
+task main()
+{
+    float k = 1;
+    float l = 1;
+
+    motor[shoulder] = toCmd(sholder(k, l) * gorp);
+    motor[elbow]    = toCmd(elbo(k, l) * gorp);
+
+    while (true)
+    {
+        wait1Msec(20);
+    }
+}
