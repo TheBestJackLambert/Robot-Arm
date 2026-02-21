@@ -194,21 +194,39 @@ def sphere(coordinates):
 def system(beeple):
   return [0, 0, 0]
 
+#gets the world-space rotation axis for a given joint
+def get_world_axis(angles, orientation, joint_idx):
+  M = [[1,0,0],
+       [0,1,0],
+       [0,0,1]]
+  for i in range(joint_idx):
+    a = angles[i]
+    c = cos(a)
+    s = sin(a)
+    if orientation[i] == "x":
+      R = [[1,0,0],
+           [0,c,-s],
+           [0,s,c]]
+    elif orientation[i] == "y":
+      R = [[c,0,s],
+           [0,1,0],
+           [-s,0,c]]
+    elif orientation[i] == "z":
+      R = [[c,-s,0],
+           [s,c,0],
+           [0,0,1]]
+    N = [[sum(M[r][k]*R[k][cc] for k in range(3)) for cc in range(3)] for r in range(3)]
+    M = N
+  if orientation[joint_idx] == 'x': col = 0
+  elif orientation[joint_idx] == 'y': col = 1
+  else: col = 2
+  return [M[0][col], M[1][col], M[2][col]]
+
 #finds the angle between 2 points, around a common center
 def anglefind(length, angles, orientation, end, lorient, gorp):
   blorp = fk(length, angles, orientation, lorient)
   if gorp == 0:
-    shorb = orientation[0]
-    if shorb == 'x':
-      a = 1
-      b = 2
-    elif shorb == 'y':
-      a = 0
-      b = 2
-    elif shorb == 'z':
-      a = 0
-      b = 1
-    return arctan(end[a], end[b]) - arctan(blorp[a], blorp[b])
+    current = [0, 0, 0]
   else:
     blorple = []
     shlorb = []
@@ -219,8 +237,9 @@ def anglefind(length, angles, orientation, end, lorient, gorp):
       shlorb.append(angles[i])
       glorb.append(orientation[i])
       plorb.append(lorient[i])
-    blorble = fk(blorple, shlorb, glorb, plorb)
-    return project(system(angle(shlorb, glorb)), glorb[-1], end, blorble, blorp)
+    current = fk(blorple, shlorb, glorb, plorb)
+  axis_vec = get_world_axis(angles, orientation, gorp)
+  return project(axis_vec, end, current, blorp)
 
 
 def rotMat(angle, orient):
@@ -241,31 +260,22 @@ def rotMat(angle, orient):
               [0, 0, 0, 1]]
   return matrix
 
-def project(transform, orientation, goal, current, joint):
-  gx = goal[0] - current[0]
-  gy = goal[1] - current[1]
-  gz = goal[2] - current[2]
+def project(axis_world, goal, current, joint):
+  goal_vec = [goal[i] - current[i] for i in range(3)]
+  end_vec = [joint[i] - current[i] for i in range(3)]
 
-  ex = joint[0] - current[0]
-  ey = joint[1] - current[1]
-  ez = joint[2] - current[2]
+  #project onto plane perpendicular to rotation axis
+  g_dot = sum(goal_vec[i]*axis_world[i] for i in range(3))
+  e_dot = sum(end_vec[i]*axis_world[i] for i in range(3))
+  gp = [goal_vec[i] - g_dot*axis_world[i] for i in range(3)]
+  ep = [end_vec[i] - e_dot*axis_world[i] for i in range(3)]
 
-  goal_vec = [gx, gy, gz]
-  end_vec = [ex, ey, ez]
+  #signed angle via cross and dot product
+  cross = sum(axis_world[i]*(ep[(i+1)%3]*gp[(i+2)%3] - ep[(i+2)%3]*gp[(i+1)%3]) for i in range(3))
+  dot = sum(gp[i]*ep[i] for i in range(3))
 
-  if orientation == 'x':
-    a = 1
-    b = 2
-  elif orientation == 'y':
-    a = 0
-    b = 2
-  else:
-    a = 0
-    b = 1
+  return arctan(dot, cross)
 
-  angle_goal = arctan(goal_vec[a], goal_vec[b])
-  angle_end = arctan(end_vec[a], end_vec[b])
-  return angle_goal - angle_end
 
   #multiplies two matrices
 def mm(a, b):
